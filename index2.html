@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Sample Three.js</title>
+		<style>
+			#container {
+				background: #000;
+				width: 400px;
+				height: 300px;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<div id="container">
+		</div>
+		
+	</body>
+	<!-- Shaders -->
+	<script type="x-shader/x-vertex" id="vertexshader">
+		
+		// switch on high precision floats
+		#ifdef GL_ES
+		precision highp float;
+		#endif
+
+	attribute float noise;
+	varying float vNoise;
+
+
+	void main() {
+	    vNoise = noise;
+  		gl_Position = projectionMatrix *
+                	modelViewMatrix *
+                	vec4(position,1.0);
+		}
+
+	</script>
+	
+	<script type="x-shader/x-fragment" id="fragmentshader">
+	
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+	varying float vNoise;
+	
+	void main()
+	{
+	  		gl_FragColor = vec4(0.0,  // R
+	                      	1.0*vNoise,  // G
+	                      	0.0,  // B
+	                      	1.0); // A
+	  
+						  
+	}
+	
+	</script>
+	
+	<!-- End Shaders -->
+	<script type="text/javascript" src="js/three.min.js"></script>
+	
+	<script type="text/javascript">
+
+	// set the scene size
+	var WIDTH = 400,
+	    HEIGHT = 300;
+	
+	// set some camera attributes
+	var VIEW_ANGLE = 50,
+	    ASPECT = WIDTH / HEIGHT,
+	    NEAR = 0.1,
+	    FAR = 1000;
+	
+	// get the DOM element to attach to
+	// - assume we've got jQuery to hand
+	var container = document.querySelector('#container');
+	// get the shaders
+	var vertexShader = document.querySelector('#vertexshader').textContent;
+	var fragmentShader = document.querySelector('#fragmentshader').textContent;	
+	
+	// set up the plane
+	var width = 900, heigh = 600;
+	var plane = new THREE.PlaneGeometry(width,heigh)
+
+	// add a uniform for the noise amplitude
+	var uniforms = {
+  		fog: {
+    		type: 'f', // a float
+    		value: 0
+  		}
+	};
+	
+	// add attribute for the noise 
+	var attributes = {
+  	noise: {
+    	type: 'f', // a float
+    	value: [] // an empty array
+	  }
+	};	
+	// now populate the array of attributes
+	var verts =
+  		plane.vertices;
+
+	var values =
+  		attributes.noise.value;
+
+	for (var v = 0; v < verts.length; v++) {
+  		values.push(Math.random());
+	}
+	
+	// create the shaders material
+	var shaderMaterial = new THREE.ShaderMaterial({
+      uniforms:       uniforms,
+      attributes:     attributes,
+	  vertexShader:   vertexShader,
+	  fragmentShader: fragmentShader
+    });
+		
+	// create a new mesh 
+	var mesh = new THREE.Mesh(
+	   plane,
+	   shaderMaterial);		
+	
+	
+	// create a WebGL renderer, camera
+	// and a scene
+	var renderer = new THREE.WebGLRenderer();
+	var camera = new THREE.PerspectiveCamera(  VIEW_ANGLE,
+	                                ASPECT,
+	                                NEAR,
+	                                FAR  );
+	var scene = new THREE.Scene();
+	
+	// the camera starts at 0,0,0 so pull it back
+	camera.position.z = 1000;
+
+	// start the renderer
+	renderer.setSize(WIDTH, HEIGHT);
+	
+	// attach the render-supplied DOM element
+	container.appendChild(renderer.domElement);
+
+
+	
+	// add the mesh to the scene
+	function render() {
+	  requestAnimationFrame(render);
+	  renderer.render(scene, camera);
+	}
+
+	scene.add(mesh);
+
+	requestAnimationFrame(render);
+	// draw!
+	renderer.render(scene, camera);
+	</script>
+</html>
