@@ -1,0 +1,277 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Sample Three.js</title>
+		<style>
+			#container {
+				background: #000;
+				width: 400px;
+				height: 300px;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<div id="container">
+		</div>
+		
+	</body>
+	<!-- Shaders -->
+	<script type="x-shader/x-vertex" id="vertexshader">
+		
+		// switch on high precision floats
+		#ifdef GL_ES
+		precision highp float;
+		#endif
+
+	attribute float noise;
+    varying vec3 vPosition;
+
+	void main() {
+  		gl_Position = projectionMatrix *
+                	modelViewMatrix *
+                	vec4(position,1.0);
+					
+		vPosition = gl_Position.xyz;
+		}
+
+	</script>
+	
+	<script type="x-shader/x-fragment" id="fragmentshader">
+	
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+	
+varying vec3 vPosition;
+uniform float time;
+
+
+vec3 centre = vec3(0.5,0.5,0.5);
+float rad = 0.25;
+float rad2 = 0.0625;
+
+bool incircle(in float x,in float y, in float cx, float cy,float radious ){
+  if ((x-cx)*(x-cx)+(y-cy)*(y-cy)<radious*radious){
+    return true;
+  };
+    return false;
+}
+
+float Potential(in vec3 vPosition){
+  float value = 0.0;
+  value += (vPosition.x-centre.x)*(vPosition.x-centre.x);
+  value += (vPosition.y-centre.y)*(vPosition.y-centre.y);
+  value += (vPosition.z-centre.z)*(vPosition.z-centre.z);
+  return value - rad2;
+}
+
+float PotentialCube(in vec3 vPosition){
+  float value = 0.0;
+  value = max(abs(vPosition.x-centre.x)/rad,max(abs(vPosition.y-centre.y)/rad,abs(vPosition.z-centre.z)/rad));
+  return value - 1.0;
+}
+
+float PotentialCylinder(in vec3 vPosition){
+  float value = 0.0;
+  value += (vPosition.x-centre.x)*(vPosition.x-centre.x);
+  value += (vPosition.y-centre.y)*(vPosition.y-centre.y);
+  value = max(value,rad2);
+  value = value * max(abs(vPosition.z-centre.z),1.0);
+  return value - rad2;
+}
+
+
+// a line vPosition definied by stating point , delta or direction and a value alpha
+vec3 line(in float alpha, vec3 vPosition0, vec3 delta) { 
+  return vPosition0 + alpha*delta;
+}
+
+vec3 gradientPotential(in vec3 vPosition){
+   float delta= 0.001;
+   vec3 normal= vec3(0.0,0.0,0.0);
+   vec3 tempPosition;
+
+   tempPosition = vPosition;
+   tempPosition.x+=delta;
+   normal.x = (Potential(tempPosition)-Potential(vPosition))/delta ;
+
+   tempPosition = vPosition;
+   tempPosition.y+=delta;
+   normal.y = (Potential(tempPosition)-Potential(vPosition))/delta;
+
+   tempPosition = vPosition;
+   tempPosition.z+=delta;
+   normal.z = (Potential(tempPosition)-Potential(vPosition))/delta;
+   return normal;
+}
+
+
+// next value to find root, as newton rapshon method
+float nextValue (float fx, in float x, float fxdx){
+  float next;
+  next = x - fx/fxdx;
+  return next ; 
+
+}
+
+
+float findAlpha (vec3 vPosition0,vec3 delta) {
+  float Alpha=0.0;
+  vec3  newPos;
+  vec3  deltaPos;
+  float fx;
+  float dfxdx;
+  for (int dx=0;dx<50;dx++) {
+        newPos  =line(Alpha,  vPosition0, delta);
+        deltaPos=line(Alpha+0.00001,  vPosition0, delta);        
+        fx =  Potential(newPos);  
+        if (fx > 0.00001 || fx < 0.0001) {
+          dfxdx =  (Potential(deltaPos)-fx)/0.00001; 
+          Alpha = nextValue(fx, Alpha, dfxdx) ;         
+        }
+  };
+  return Alpha;
+}
+
+
+vec3 findMinimum(vec3 vPosition0,vec3 delta){
+  float alpha =  findAlpha (vPosition0,delta);
+  return line(alpha,  vPosition0, delta);;
+}
+
+
+float getCircleZ (float x, float y, float rad) {
+  float z = 0.0 ;
+  float beta = asin((y-centre.y)/rad) ;
+  float alpha = asin((x-centre.x)/(rad*cos(beta)));
+   z =rad*cos(beta)*cos(alpha);
+   return z;
+}
+void main() {
+  vec3 light = vec3(cos(time/2.0), sin(time), sin(time));
+  vec3 normal= vec3(0.0, 0.0, 0.0);
+  vec3 start= vec3(vPosition.x,vPosition.y,0.0 );
+  vec3 direction= vec3(0.2, 0.3, 1.0);
+  float intensity =0.0;
+  float alpha = findAlpha(start ,direction);
+  vec3 SurfacePoint=line(alpha, start,direction);
+  gl_FragColor.g =0.0;
+  if (Potential(SurfacePoint)< 0.00001){
+    normal = normalize(gradientPotential(SurfacePoint));
+    intensity = max(dot( normalize(light),normalize(normal)),0.0);
+     gl_FragColor.g = intensity;
+  }
+  
+  gl_FragColor.r = intensity;
+ 
+  gl_FragColor.b = intensity;
+  gl_FragColor.a = 1.0;
+}
+	
+	</script>
+	
+	<!-- End Shaders -->
+	<script type="text/javascript" src="js/three.min.js"></script>
+	
+	<script type="text/javascript">
+
+	// set the scene size
+	var WIDTH = 600,
+	    HEIGHT = 600;
+	
+	// set some camera attributes
+	var VIEW_ANGLE = 50,
+	    ASPECT = WIDTH / HEIGHT,
+	    NEAR = 0.1,
+	    FAR = 100;
+	
+	// get the DOM element to attach to
+	// - assume we've got jQuery to hand
+	var container = document.querySelector('#container');
+	// get the shaders
+	var vertexShader = document.querySelector('#vertexshader').textContent;
+	var fragmentShader = document.querySelector('#fragmentshader').textContent;	
+	
+	// set up the plane
+	var width = 10, heigh = 10;
+	var plane = new THREE.PlaneGeometry(width,heigh)
+
+	// add a uniform for the noise amplitude
+	var uniforms = {
+  		time: {
+    		type: 'f', // a float
+    		value: 0
+  		}
+	};
+	
+	// add attribute for the noise 
+	var attributes = {
+  	noise: {
+    	type: 'f', // a float
+    	value: [] // an empty array
+	  }
+	};	
+	// now populate the array of attributes
+	var verts =
+  		plane.vertices;
+
+	var values =
+  		attributes.noise.value;
+
+	for (var v = 0; v < verts.length; v++) {
+  		values.push(Math.random());
+	}
+	
+	// create the shaders material
+	var shaderMaterial = new THREE.ShaderMaterial({
+      uniforms:       uniforms,
+      attributes:     attributes,
+	  vertexShader:   vertexShader,
+	  fragmentShader: fragmentShader
+    });
+		
+	// create a new mesh 
+	var mesh = new THREE.Mesh(
+	   plane,
+	   shaderMaterial);		
+	
+	
+	// create a WebGL renderer, camera
+	// and a scene
+	var renderer = new THREE.WebGLRenderer();
+	var camera = new THREE.PerspectiveCamera(  VIEW_ANGLE,
+	                                ASPECT,
+	                                NEAR,
+	                                FAR  );
+	var scene = new THREE.Scene();
+	
+	// the camera starts at 0,0,0 so pull it back
+	camera.position.z = 1;
+
+	// start the renderer
+	renderer.setSize(WIDTH, HEIGHT);
+	
+	// attach the render-supplied DOM element
+	container.appendChild(renderer.domElement);
+
+    // init frame 
+	var frame = 0;
+	// add the mesh to the scene
+	function render() {
+	  uniforms.time.value =
+    		Math.sin(frame);	
+  	  // update the frame counter
+      frame += 0.01;	
+	  renderer.render(scene, camera);
+	  requestAnimationFrame(render);
+	}
+
+	scene.add(mesh);
+
+	requestAnimationFrame(render);
+
+	</script>
+</html>
